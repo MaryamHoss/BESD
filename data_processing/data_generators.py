@@ -1,158 +1,365 @@
 # done, changed to correct
 
-import h5py
+import h5py, os
 import numpy as np
 from numpy.random import seed
-import tensorflow as tf
 
-'''
-def Prediction_Generator(
-        filepath, nb_lines, max_len, shift, downsample_by):
-    file = h5py.File(filepath, 'r')
-    key = [key for key in file][0]
+from tensorflow.python.keras.utils.data_utils import Sequence
 
-    i = 0
-    while i < nb_lines:
-        batch = file[key][i, shift:max_len + shift]
-        #the problem is the line above gives an output of shape (218880,1), to fix it we either add a dimension (1,218880,1) or on the line
-        #below we change batch=batch[::downsample_by]. Don't know which one is the format required by the generator. will test
-        #batch = batch[:, ::downsample_by]
-        batch = batch[::downsample_by]
-        i += 1
-        yield batch'''
+'''if tf.__version__[:2] == '1.':
+    from tensorflow import compat
+    compat.v1.set_random_seed(14)
+elif tf.__version__[:2] == '2.':
+    tf.random.set_seed(14)'''
 
-def Prediction_Generator(
-        filepath, nb_lines, max_len, shift, downsample_by,batch_size):
-    file = h5py.File(filepath, 'r')
-    key = [key for key in file][0]
 
-    batch_index = 0
-    batch_stop=0
-    while batch_stop < nb_lines:
-        batch_start = batch_index * batch_size
-        batch_stop = batch_start + batch_size
-        
-        batch = file[key][batch_start:batch_stop, shift:max_len + shift]
-        #the problem is the line above gives an output of shape (218880,1), to fix it we either add a dimension (1,218880,1) or on the line
-        #below we change batch=batch[::downsample_by]. Don't know which one is the format required by the generator. will test
-        #batch = batch[:, ::downsample_by]
-        batch = batch[:,::downsample_by]
-        batch_index += 1
-        yield batch
-        
+def getDataPaths(data_type):
+    data_paths = {}
+    for set in ['train', 'val', 'test']:
+        time_folder = '60s' if set == 'test' else '2s'
 
-            
-def Prediction_Dataset(
-        filepath_input_first,
-        filepath_input_second,
-        filepath_output,
+        # FIXME:
+
+        if 'eeg' in data_type:
+            if 'denoising' in data_type:
+                if 'FBC' in data_type:
+                    data_paths['in1_{}'.format(set)] = os.path.join(
+                        *[EEG_h5_DIR, time_folder, 'fbc', 'noisy_{}.h5'.format(set)])
+                    data_paths['in2_{}'.format(set)] = os.path.join(
+                        *[EEG_h5_DIR, time_folder, 'fbc', 'eegs_{}.h5'.format(set)])
+                    data_paths['out_{}'.format(set)] = os.path.join(
+                        *[EEG_h5_DIR, time_folder, 'fbc', 'clean_{}.h5'.format(set)])
+                    data_paths['out_{}_unattended'.format(set)] = os.path.join(
+                        *[EEG_h5_DIR, time_folder, 'fbc', 'unattended_{}.h5'.format(set)])
+
+                elif 'RAW' in data_type:
+                    data_paths['in1_{}'.format(set)] = os.path.join(
+                        *[EEG_h5_DIR, time_folder, 'raw_eeg', 'noisy_{}.h5'.format(set)])
+                    data_paths['in2_{}'.format(set)] = os.path.join(
+                        *[EEG_h5_DIR, time_folder, 'raw_eeg', 'eegs_{}.h5'.format(set)])
+                    data_paths['out_{}'.format(set)] = os.path.join(
+                        *[EEG_h5_DIR, time_folder, 'raw_eeg', 'clean_{}.h5'.format(set)])
+                    data_paths['out_{}_unattended'.format(set)] = os.path.join(
+                        *[EEG_h5_DIR, time_folder, 'raw_eeg', 'unattended_{}.h5'.format(set)])
+
+                else:
+                    data_paths['in1_{}'.format(set)] = os.path.join(
+                        *[EEG_h5_DIR, time_folder, 'eeg', 'noisy_{}.h5'.format(set)])
+                    data_paths['in2_{}'.format(set)] = os.path.join(
+                        *[EEG_h5_DIR, time_folder, 'eeg', 'eegs_{}.h5'.format(set)])
+                    data_paths['out_{}'.format(set)] = os.path.join(
+                        *[EEG_h5_DIR, time_folder, 'eeg', 'clean_{}.h5'.format(set)])
+                    data_paths['out_{}_unattended'.format(set)] = os.path.join(
+                        *[EEG_h5_DIR, time_folder, 'eeg', 'unattended_{}.h5'.format(set)])
+
+            else:
+                raise NotImplementedError
+        else:
+            raise NotImplementedError
+
+    return data_paths
+
+
+def getData(
         sound_shape=(3, 1),
         spike_shape=(3, 1),
-        batch_size=32,
-        data_type='',
-        downsample_sound_by=3):
-    #this lower line didn't work
-    #with h5py.File(filepath_input_first, 'r') as f:
-        #nb_lines = len(f[f[0]])
-    
-    with h5py.File(filepath_input_first, 'r') as f:
+        data_type='real_prediction',
+        batch_size=128,
+        downsample_sound_by=3,
+        terms=3, predict_terms=3):
+    data_paths = {}
+    if not 'random' in data_type:
+        data_paths = getDataPaths(data_type)
+
+    generators = {}
+    if not any([i in data_type for i in ['cpc', 'random']]):
+
+        generator_train, generator_val, generator_test = [
+            Prediction_Generator(
+                filepath_input_first=data_paths['in1_{}'.format(set_name)],
+                filepath_input_second=data_paths['in2_{}'.format(set_name)],
+                filepath_output=data_paths['out_{}'.format(set_name)],
+                sound_shape=sound_shape,
+                spike_shape=spike_shape,
+                batch_size=b,
+                data_type=data_type,
+                downsample_sound_by=downsample_sound_by)
+            for b, set_name in zip([batch_size, batch_size, 1], ['train', 'val', 'test'])]
+
+        try:
+            generator_test_unattended = Prediction_Generator(
+                filepath_input_first=data_paths['in1_test'],
+                filepath_input_second=data_paths['in2_test'],
+                filepath_output=data_paths['out_test_unattended'],
+                sound_shape=sound_shape,
+                spike_shape=spike_shape,
+                batch_size=1,
+                data_type=data_type,
+                downsample_sound_by=downsample_sound_by)
+
+            generators.update(test_unattended=generator_test_unattended)
+        except:
+            print('Run preprocessed_to_h5.py again to generate the unattended_x.h5')
+
+    elif 'random' in data_type:
+
+        generator_train, generator_val, generator_test = [Random_Generator(sound_shape=sound_shape,
+                                                                           spike_shape=spike_shape,
+                                                                           batch_size=batch_size,
+                                                                           data_type=data_type,
+                                                                           downsample_sound_by=downsample_sound_by)
+                                                          for _ in range(3)]
+        generators.update(test_unattended=generator_test)
+    else:
+        raise NotImplementedError
+
+    generators.update(
+        train=generator_train,
+        val=generator_val,
+        test=generator_test)
+    return generators
+
+
+class Prediction_Generator(Sequence):
+    def __init__(self,
+                 filepath_input_first,
+                 filepath_input_second,
+                 filepath_output,
+                 sound_shape=(3, 1),
+                 spike_shape=(3, 1),
+                 batch_size=32,
+                 data_type='',
+                 downsample_sound_by=3):
+
+        self.__dict__.update(filepath_input_first=filepath_input_first,
+                             filepath_input_second=filepath_input_second,
+                             filepath_output=filepath_output,
+                             sound_shape=sound_shape,
+                             spike_shape=spike_shape,
+                             batch_size=batch_size,
+                             data_type=data_type,
+                             downsample_sound_by=downsample_sound_by
+                             )
+
+        self.input_len_1 = sound_shape[0]
+        self.input_len_2 = spike_shape[0]
+        self.output_len = spike_shape[0] if 'spike' in filepath_output else sound_shape[0]
+
+        self.batch_size = batch_size
+        self.batch_index = 0
+
+        self.count_lines_in_file()
+        self.on_epoch_end()
+        self.ratio_sound_spike = int(sound_shape[0] / downsample_sound_by) / spike_shape[0]
+        assert self.ratio_sound_spike.is_integer()
+        self.select_subject(None)
+
+    def __len__(self):
+        self.steps_per_epoch = int(np.floor((self.nb_lines) / self.batch_size))
+        return self.steps_per_epoch
+
+    def count_lines_in_file(self):
+        self.nb_lines = 0
+        f = h5py.File(self.filepath_input_first, 'r')
         for key in f.keys():
-            nb_lines = len(f[key])
-            
-    print('Number of samples in the file: {}'.format(nb_lines))
+            for line in range(len(f[key])):
+                self.nb_lines += 1
 
-    downsampled_sound_shape = (int(sound_shape[0] / downsample_sound_by), sound_shape[1])
+    def __getitem__(self, index=0):
+        return self.batch_generation()
 
-    input_sound_generator = tf.data.Dataset.from_generator(
-        Prediction_Generator,
-        args=[filepath_input_first, nb_lines, sound_shape[0], 0, downsample_sound_by,batch_size],
-        output_types=(tf.float32), output_shapes=(None,downsampled_sound_shape[0],downsampled_sound_shape[1]))
-    output_sound_generator = tf.data.Dataset.from_generator(
-        Prediction_Generator,
-        args=[filepath_output, nb_lines, sound_shape[0], 1, downsample_sound_by,batch_size],
-        output_types=(tf.float32), output_shapes=(None,downsampled_sound_shape[0],downsampled_sound_shape[1]))
+    def select_subject(self, subject=2):
+        self.samples_of_interest = range(self.input_file_first[self.input_1_key].shape[
+                                             0])  # this takes the range of the number of test samples in the data
+        if not subject == None:  # if we have a subject
+            head, tail = os.path.split(self.filepath_output)  # separates the folder from the file name
+            set = [s for s in ['train', 'val', 'test'] if s in tail][
+                0]  # takes the name of the test data (clean_test.h5)
+            subject_path = os.path.join(*[head, 'subjects_{}.h5'.format(
+                set)])  # adds the subjects_test.h5 to the end of the path, so it gives us the subject list path
+            subject_file = h5py.File(subject_path, 'r')
+            subject_key = [key for key in subject_file][0]
+            self.samples_of_interest = [i for i, s in enumerate(subject_file[subject_key][:]) if s == subject]
+            # takes the list of subjects, finds all the indexes of the array items that correspons to the subject
+        self.nb_lines = len(
+            self.samples_of_interest)  # returns the number of the samples in the test data that correspond to the subject of interest
+        # if the method select_subject with a subject of interest is not called, this will return all the samples of the data, no problem for train and validation
 
-    if data_type == 'noSpikes':
-        input_generator = input_sound_generator
-    else:
-        spike_generator = tf.data.Dataset.from_generator(
-            Prediction_Generator,
-            args=[filepath_input_second, nb_lines, spike_shape[0], 0, 1,batch_size],
-            output_types=(tf.float32), output_shapes=(None,spike_shape[0],spike_shape[1]))
-        input_generator = tf.data.Dataset.zip((input_sound_generator, spike_generator))
+    def on_epoch_end(self):
+        self.batch_index = 0
+        self.input_file_first = h5py.File(self.filepath_input_first, 'r')
+        self.input_file_second = h5py.File(self.filepath_input_second, 'r')
+        self.output_file = h5py.File(self.filepath_output, 'r')
 
-    generator = tf.data.Dataset.zip((input_generator, output_sound_generator))
+        self.input_1_key = [key for key in self.input_file_first][0]
+        self.input_2_key = [key for key in self.input_file_second][0]
+        self.output_key = [key for key in self.output_file][0]
 
-    generator_batch = generator.shuffle(20)#.batch(batch_size)
-    return generator_batch
+    def batch_generation(self):
+        batch_start = self.batch_index * self.batch_size
+        batch_stop = batch_start + self.batch_size
+
+        if batch_stop > self.nb_lines:
+            self.batch_index = 0
+            batch_start = self.batch_index * self.batch_size
+            batch_stop = batch_start + self.batch_size
+
+        self.batch_index += 1
+
+        samples = self.samples_of_interest[
+                  batch_start:batch_stop]  # if batch=1, takes each samples index belonging to the subject of interest
+        input_batch_first = self.input_file_first[self.input_1_key][samples, :self.input_len_1]  # and load them
+        input_batch_second = self.input_file_second[self.input_2_key][samples, :self.input_len_2]
+        output_batch = self.output_file[self.output_key][samples, 1:self.output_len + 1]
+
+        input_batch_first = input_batch_first[:, ::self.downsample_sound_by]
+        input_batch_second = np.repeat(input_batch_second, self.ratio_sound_spike, 1)
+        output_batch = output_batch[:, ::self.downsample_sound_by]
+
+        # print(input_batch_first.shape, input_batch_second.shape, output_batch.shape)
+        if 'noSpikes' in self.data_type:
+            return input_batch_first, output_batch
+        elif 'WithSpikes' in self.data_type:
+            return [input_batch_first, input_batch_second], output_batch
+        else:
+            raise NotImplementedError
 
 
-def Random_Generator(
-        shape=None,
-        n_samples=32):
-    i = 0
-    while i < n_samples:
-        i += 1
-        yield np.array(np.random.rand(*shape), dtype='float32')
+class Subject_Prediction_Generator(Prediction_Generator):
+    def __init__(self,
+                 filepath_input_first,
+                 filepath_input_second,
+                 filepath_output,
+                 sound_shape=(3, 1),
+                 spike_shape=(3, 1),
+                 batch_size=32,
+                 data_type='',
+                 downsample_sound_by=3):
+
+        self.__dict__.update(filepath_input_first=filepath_input_first,
+                             filepath_input_second=filepath_input_second,
+                             filepath_output=filepath_output,
+                             sound_shape=sound_shape,
+                             spike_shape=spike_shape,
+                             batch_size=batch_size,
+                             data_type=data_type,
+                             downsample_sound_by=downsample_sound_by
+                             )
+
+        self.input_len_1 = sound_shape[0]
+        self.input_len_2 = spike_shape[0]
+        self.output_len = spike_shape[0] if 'spike' in filepath_output else sound_shape[0]
+
+        self.batch_size = batch_size
+        self.batch_index = 0
+
+        self.count_lines_in_file()
+        self.on_epoch_end()
+
+    def __getitem__(self, index=0):
+        return self.batch_generation()
+
+    def on_epoch_end(self):
+        self.batch_index = 0
+        self.input_file_first = h5py.File(self.filepath_input_first, 'r')
+        self.input_file_second = h5py.File(self.filepath_input_second, 'r')
+        self.output_file = h5py.File(self.filepath_output, 'r')
+
+        try:
+            head, tail = os.path.split(self.filepath_output)
+            set = [s for s in ['train', 'val', 'test'] if s in tail][0]
+            self.subject_file = os.path.join(*[head, 'subjects_{}.h5'.format(set)])
+        except:
+            pass
+
+        self.input_1_key = [key for key in self.input_file_first][0]
+        self.input_2_key = [key for key in self.input_file_second][0]
+        self.output_key = [key for key in self.output_file][0]
+
+    def batch_generation(self):
+        batch_start = self.batch_index * self.batch_size
+        batch_stop = batch_start + self.batch_size
+
+        if batch_stop > self.nb_lines:
+            self.batch_index = 0
+            batch_start = self.batch_index * self.batch_size
+            batch_stop = batch_start + self.batch_size
+
+        self.batch_index += 1
+
+        input_batch_first = self.input_file_first[self.input_1_key][batch_start:batch_stop, :self.input_len_1]
+        input_batch_second = self.input_file_second[self.input_2_key][batch_start:batch_stop, :self.input_len_2]
+        output_batch = self.output_file[self.output_key][batch_start:batch_stop, 1:self.output_len + 1]
+
+        if 'noSpikes' in self.data_type:
+            return input_batch_first[:, ::self.downsample_sound_by], \
+                   output_batch[:, ::self.downsample_sound_by]
+        elif 'WithSpikes' in self.data_type:
+            return [input_batch_first[:, ::self.downsample_sound_by], input_batch_second], \
+                   output_batch[:, ::self.downsample_sound_by]
+        else:
+            raise NotImplementedError
 
 
-def Random_Dataset(sound_shape,
-                   spike_shape,
-                   batch_size,
-                   data_type,
-                   downsample_sound_by):
-    downsampled_sound_shape = (int(sound_shape[0] / downsample_sound_by), sound_shape[1])
-    n_samples = 100
-    sound_generator = tf.data.Dataset.from_generator(
-        Random_Generator, args=[downsampled_sound_shape, n_samples],
-        output_types=(tf.float32), output_shapes=downsampled_sound_shape)
+class Reconstruction_Generator(Prediction_Generator):
+    def batch_generation(self):
+        batch_start = self.batch_index * self.batch_size
+        batch_stop = batch_start + self.batch_size
+        if batch_stop > self.nb_lines:
+            self.batch_index = 0
+            batch_start = self.batch_index * self.batch_size
+            batch_stop = batch_start + self.batch_size
 
-    if data_type == 'noSpikes':
-        input_generator = sound_generator
-    else:
-        spike_generator = tf.data.Dataset.from_generator(
-            Random_Generator, args=[spike_shape, n_samples],
-            output_types=(tf.float32), output_shapes=spike_shape)
-        input_generator = tf.data.Dataset.zip((sound_generator, spike_generator))
+        self.batch_index += 1
 
-    generator = tf.data.Dataset.zip((input_generator, sound_generator))
+        input_batch_first = self.input_file_first[self.input_1_key][batch_start:batch_stop, :self.input_len_1]
+        input_batch_second = self.input_file_second[self.input_2_key][batch_start:batch_stop, :self.input_len_2]
+        output_batch = self.output_file[self.output_key][batch_start:batch_stop, 1:self.output_len + 1]
 
-    generator_batch = generator.shuffle(20).batch(batch_size)
-    return generator_batch
+        return [input_batch_first[:, :, np.newaxis], input_batch_second[:, :, np.newaxis]], \
+               output_batch[:, :, np.newaxis]
+
+
+class Random_Generator(Sequence):
+    def __init__(self,
+                 sound_shape=None,
+                 spike_shape=None,
+                 batch_size=32,
+                 data_type='noSpikes',
+                 downsample_sound_by=3):
+
+        self.__dict__.update(batch_size=batch_size, data_type=data_type, downsample_sound_by=downsample_sound_by)
+
+        if 'WithSpikes' in data_type:
+            self.input_shape = spike_shape
+            self.output_shape = sound_shape
+        elif 'noSpike' in data_type:
+            self.input_shape = sound_shape
+            self.output_shape = sound_shape
+        else:
+            raise NotImplementedError
+
+    def __len__(self):
+        return 2
+
+    def __getitem__(self, index=0):
+        return self.batch_generation()
+
+    def batch_generation(self):
+        input_batch = np.array(np.random.rand(self.batch_size, *self.input_shape), dtype='float32')
+        output_batch = np.array(np.random.rand(self.batch_size, *self.output_shape), dtype='float32')
+
+        if 'noSpike' in self.data_type:
+            output = (input_batch[:, ::self.downsample_sound_by, :],
+                      output_batch[:, ::self.downsample_sound_by, :])
+        elif 'WithSpikes' in self.data_type:
+            output = ([output_batch[:, ::self.downsample_sound_by, :], input_batch],
+                      output_batch[:, ::self.downsample_sound_by, :])
+        else:
+            raise NotImplementedError
+
+        return output
 
 
 if __name__ == '__main__':
-    epochs = 2  # 15  # 75  # 3
-    batch_size = 2  # for 5 seconds #16 for 2 seconds
-
-    downsample_sound_by = 3  # choices: 3 and 10
-    sound_len = 4 * 3  # 87552  # 87040 for downsample by 10 #87552 for downsample sound by=3  # 87552  # insteead of88200  #2626560#2610860
-    fs = 44100 / downsample_sound_by
-    spike_len = 2  # 256  # 7680 # 7679
-
-    fusion_type = '_add'  ## choices: 1) _concatenate 2) _FiLM_v1 3) _FiLM_v2 4) _FiLM_v3
-    exp_type = 'WithSpikes'  # choices: 1) noSpike 2) WithSpikes
-    input_type = 'random_eeg_'  # choices: 1) denoising_eeg_ 2) denoising_eeg_FBC_ 3) real_prediction_ 4) random_eeg_
-    data_type = input_type + exp_type + fusion_type
-    n_channels = 128 if 'eeg' in data_type else 1
-
-    sound_shape = (sound_len, 1)
-    spike_shape = (spike_len, n_channels)
-
-    data_type = 0 if data_type == 'noSpikes' else 1
-    downsampled_sound_shape = (int(sound_shape[0] / downsample_sound_by), sound_shape[1])
-    n_samples = 100
-    sound_generator = tf.data.Dataset.from_generator(Random_Generator, args=[downsampled_sound_shape, n_samples],
-                                                     output_types=(tf.float32), output_shapes=downsampled_sound_shape)
-    spike_generator = tf.data.Dataset.from_generator(Random_Generator, args=[spike_shape, n_samples],
-                                                     output_types=(tf.float32), output_shapes=spike_shape)
-
-    input_generator = tf.data.Dataset.zip((sound_generator, spike_generator))
-    generator = tf.data.Dataset.zip((input_generator, sound_generator))
-
-    ds_series_batch = generator.shuffle(20).batch(batch_size)
-
-    input, output = next(iter(ds_series_batch))
-    print(input)
-    print()
-    print(output)
+    gen = Subject_Prediction_Generator

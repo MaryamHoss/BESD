@@ -1,6 +1,6 @@
 import os, sys, shutil, json
 
-from BESD.data_processing.convenience_tools_oldGen import getData
+from BESD.data_processing.data_generators import getData
 from GenericTools.KerasTools.plot_tools import plot_history
 
 sys.path.append('../')
@@ -28,7 +28,7 @@ def cfg():
     batch_size = 16  # 8 for 5 seconds #16 for 2 seconds
 
     downsample_sound_by = 3  # choices: 3 and 10
-    sound_len = 256 * 6  # 87552  # 87040 for downsample by 10 #87552 for downsample sound by=3  # 87552  # insteead of88200  #2626560#2610860
+    sound_len = 256*3  # 87552  # 87040 for downsample by 10 #87552 for downsample sound by=3  # 87552  # insteead of88200  #2626560#2610860
     fs = 44100 / downsample_sound_by
     spike_len = 256  # 7680 # 7679
 

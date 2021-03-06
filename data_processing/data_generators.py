@@ -5,6 +5,9 @@ import numpy as np
 from numpy.random import seed
 
 from tensorflow.python.keras.utils.data_utils import Sequence
+CDIR = os.path.dirname(os.path.realpath(__file__))
+DATADIR = os.path.abspath(os.path.join(*[CDIR, '..', 'data']))
+
 
 '''if tf.__version__[:2] == '1.':
     from tensorflow import compat
@@ -18,7 +21,10 @@ def getDataPaths(data_type):
     for set in ['train', 'val', 'test']:
         time_folder = '60s' if set == 'test' else '2s'
 
-        # FIXME:
+        if 'kuleuven' in data_type:
+            EEG_h5_DIR = os.path.abspath(os.path.join(*[DATADIR, 'kuleuven', 'Normalized']))
+        else:
+            EEG_h5_DIR = os.path.abspath(os.path.join(*[DATADIR, 'Cocktail_Party', 'Normalized']))
 
         if 'eeg' in data_type:
             if 'denoising' in data_type:

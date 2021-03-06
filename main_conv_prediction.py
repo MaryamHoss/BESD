@@ -37,7 +37,7 @@ def cfg():
     # 11) _transformer_crossed_stairs
     exp_type = 'WithSpikes'  # choices: 1) noSpike 2) WithSpikes
     # fusion_type = fusion_type if not exp_type == 'noSpike' else ''
-    input_type = 'random_eeg_'  # choices: 1) denoising_eeg_ 2) denoising_eeg_FBC_ 3) real_prediction_ 4) random_eeg_
+    input_type = 'denoising_eeg_'  # choices: 1) denoising_eeg_ 2) denoising_eeg_FBC_ 3) real_prediction_ 4) random_eeg_
     # 5) real_reconstruction_ 6) denoising_ 7) cpc_prediction_ 8) real_prediction_eeg_
     data_type = input_type + exp_type + fusion_type
     load_model = False  # wether we start from a previously trained model

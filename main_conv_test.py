@@ -5,16 +5,11 @@ import time
 sys.path.append('../')
 
 ## For Luca: please put every thing you want to add after this line 
-from tensorflow_addons.callbacks import TimeStopping
-from GenericTools.KerasTools.noise_curriculum import NoiseSchedule
 from GenericTools.KerasTools.esoteric_optimizers.AdaBelief import AdaBelief
 
 import pandas as pd
-from tensorflow.keras.callbacks import ModelCheckpoint, EarlyStopping, ReduceLROnPlateau, TensorBoard
-from GenericTools.KerasTools.plot_tools import plot_history
-from GenericTools.SacredTools.VeryCustomSacred import CustomExperiment, ChooseGPU
+from GenericTools.StayOrganizedTools.VeryCustomSacred import CustomExperiment, ChooseGPU
 from GenericTools.StayOrganizedTools.utils import timeStructured
-from GenericTools.KerasTools.learning_rate_schedules import AddWarmUpToSchedule
 
 from TrialsOfNeuralVocalRecon.neural_models import build_model
 from TrialsOfNeuralVocalRecon.tools.plotting import save_wav, one_plot_test
@@ -22,7 +17,6 @@ from TrialsOfNeuralVocalRecon.data_processing.convenience_tools_oldGen import ge
 from tensorflow.keras.optimizers import Adam
 from TrialsOfNeuralVocalRecon.tools.calculate_intelligibility import find_intel
 from TrialsOfNeuralVocalRecon.tools.utils.losses import *
-import tensorflow.keras.backend as K
 import pickle
 from GenericTools.KerasTools.convenience_operations import snake
 import numpy as np

@@ -8,11 +8,11 @@ from BESD.neural_models import build_model
 
 import numpy as np
 import tensorflow as tf
-from GenericTools.SacredTools.VeryCustomSacred import CustomExperiment, ChooseGPU
+from GenericTools.StayOrganizedTools.VeryCustomSacred import CustomExperiment, ChooseGPU
 from tensorflow.keras.callbacks import ModelCheckpoint, EarlyStopping, ReduceLROnPlateau, TensorBoard
 
 tf.compat.v1.disable_eager_execution()
-from BESD.tools.utils.losses import si_sdr_loss, estoi_loss, stsa_mse, calc_sdr
+from BESD.tools.utils.losses import si_sdr_loss, estoi_loss, stsa_mse
 from tqdm import tqdm
 
 CDIR = os.path.dirname(os.path.realpath(__file__))

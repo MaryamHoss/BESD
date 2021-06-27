@@ -10,7 +10,7 @@ from mne.externals.pymatreader import read_mat
 import mne
 import matplotlib.pyplot as plt
 
-from GenericTools.SacredTools.VeryCustomSacred import CustomExperiment
+from GenericTools.StayOrganizedTools.VeryCustomSacred import CustomExperiment
 
 CDIR = os.path.dirname(os.path.realpath(__file__))
 superCDIR = os.path.join(*[CDIR, '..'])

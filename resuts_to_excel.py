@@ -3,8 +3,7 @@ import pandas as pd,sys
 
 sys.path.append('../')
 
-from GenericTools.KerasTools.plot_tools import plot_history
-from GenericTools.SacredTools.unzip import unzip_good_exps
+from GenericTools.StayOrganizedTools.unzip import unzip_good_exps
 from GenericTools.StayOrganizedTools.plot_tricks import large_num_to_reasonable_string
 
 pd.set_option('display.max_columns', None)

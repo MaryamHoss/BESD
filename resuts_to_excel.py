@@ -3,8 +3,8 @@ import pandas as pd,sys
 
 sys.path.append('../')
 
-from GenericTools.StayOrganizedTools.unzip import unzip_good_exps
-from GenericTools.StayOrganizedTools.plot_tricks import large_num_to_reasonable_string
+from tools.unzip import unzip_good_exps
+from tools.plot_tricks import large_num_to_reasonable_string
 
 pd.set_option('display.max_columns', None)
 pd.set_option('max_colwidth', 1)
